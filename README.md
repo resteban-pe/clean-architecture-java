@@ -185,27 +185,67 @@ cd clean-architecture-java
 mvn compile
 
 # Run all tests + JaCoCo coverage check (must pass 80% threshold)
+# ⚠ application.properties must have repository.type=inmemory before running tests
 mvn clean verify
 
 # Run the automated demo (default)
 mvn exec:java
 
-# Run the interactive CLI
+# Run the interactive CLI (bash / Git Bash)
 mvn exec:java -Dexec.args="--cli"
+
+# Run the interactive CLI (PowerShell)
+mvn exec:java "-Dexec.args=--cli"
 
 # Open coverage report (after verify)
 # target/site/jacoco/index.html
+```
+
+### Demo output
+
+Running `mvn exec:java` (default `inmemory` mode) prints:
+
+```
+Repository type : inmemory
+
+=== LIBRARY MANAGEMENT SYSTEM — demo ===
+Book created : Book{id=..., title='Clean Architecture', author='Robert C. Martin', isbn='978-0134494166', available=true}
+Book created : Book{id=..., title='Domain-Driven Design', author='Eric Evans', isbn='978-0321125217', available=true}
+Member registered : Member{id=..., name='Roosevelt Torres', email='roosevelt@resteban.pe', activeLoans=0}
+
+=== CREATE LOAN  (book1 → member) ===
+Loan opened   : Loan{id=..., bookId=..., memberId=..., status=ACTIVE}
+Book1 status  : available=false
+Member loans  : 1 active
+
+=== RETURN LOAN ===
+Loan closed   : Loan{id=..., bookId=..., memberId=..., status=RETURNED}
+Return date   : 2026-04-02
+
+=== FINAL STATE ===
+-- Books --
+  Clean Architecture | available=true
+  Domain-Driven Design | available=true
+-- Members --
+  Roosevelt Torres | active loans=0
+-- Loans --
+  loanId=... | status=RETURNED
+
+=== END ===
 ```
 
 ### Persistence mode
 
 Controlled by `src/main/resources/application.properties` — no code change required:
 
+> **Important:** always restore `repository.type=inmemory` before running `mvn clean verify`.
+> The test suite expects the default value to be `inmemory`.
+
 ```properties
-# Use in-memory HashMaps (default — no DB needed)
+# Use in-memory HashMaps (default — no DB needed, required for mvn clean verify)
 repository.type=inmemory
 
-# Use JDBC with embedded H2
+# Use JDBC with embedded H2 (for manual runs only — change back before running tests)
 repository.type=jdbc
 db.url=jdbc:h2:mem:librarydb;DB_CLOSE_DELAY=-1
 db.user=sa
