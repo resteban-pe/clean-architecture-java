@@ -18,30 +18,35 @@ The dependency rule flows strictly inward. Outer layers depend on inner layers �
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                          main/                              │
-│              LibraryApp  (manual wiring / DI)               │
+│       LibraryApp  (manual DI — demo or --cli mode)          │
 │                            │                                │
 │         ┌──────────────────▼──────────────────┐            │
 │         │          infrastructure/             │            │
-│         │   InMemoryBookRepository             │            │
-│         │   InMemoryMemberRepository           │            │
-│         │   InMemoryLoanRepository             │            │
-│         │                  │                  │            │
-│         │    ┌─────────────▼────────────┐     │            │
-│         │    │       application/       │     │            │
-│         │    │  BookService             │     │            │
-│         │    │  MemberService           │     │            │
-│         │    │  LoanService             │     │            │
-│         │    │           │              │     │            │
-│         │    │  ┌────────▼──────────┐   │     │            │
-│         │    │  │     domain/       │   │     │            │
-│         │    │  │  Book  Member     │   │     │            │
-│         │    │  │  Loan  BookId … │   │     │            │
-│         │    │  │  BookRepository   │   │     │            │
-│         │    │  │  (port / owned    │   │     │            │
-│         │    │  │   by domain)      │   │     │            │
-│         │    │  └───────────────────┘   │     │            │
-│         │    └──────────────────────────┘     │            │
-│         └────────────────────────────────────-┘            │
+│         │  persistence/                        │            │
+│         │   InMemoryBook/Member/LoanRepository │            │
+│         │   JdbcBook/Member/LoanRepository     │            │
+│         │  config/                             │            │
+│         │   AppConfig  DataSourceFactory       │            │
+│         │   RepositoryFactory                  │            │
+│         │  cli/                                │            │
+│         │   LibraryCLI  (primary adapter)      │            │
+│         │                  │                   │            │
+│         │    ┌─────────────▼────────────┐      │            │
+│         │    │       application/       │      │            │
+│         │    │  BookService             │      │            │
+│         │    │  MemberService           │      │            │
+│         │    │  LoanService             │      │            │
+│         │    │           │              │      │            │
+│         │    │  ┌────────▼──────────┐   │      │            │
+│         │    │  │     domain/       │   │      │            │
+│         │    │  │  Book  Member     │   │      │            │
+│         │    │  │  Loan  BookId …   │   │      │            │
+│         │    │  │  BookRepository   │   │      │            │
+│         │    │  │  (port / owned    │   │      │            │
+│         │    │  │   by domain)      │   │      │            │
+│         │    │  └───────────────────┘   │      │            │
+│         │    └──────────────────────────┘      │            │
+│         └─────────────────────────────────────-┘            │
 └─────────────────────────────────────────────────────────────┘
          Dependency arrow points INWARD only →
 ```
@@ -52,41 +57,54 @@ The dependency rule flows strictly inward. Outer layers depend on inner layers �
 
 ```
 src/
-├── main/java/pe/resteban/library/
-│   ├── domain/
-│   │   ├── model/
-│   │   │   ├── Book.java              # Aggregate root
-│   │   │   ├── Member.java            # Aggregate root
-│   │   │   ├── Loan.java              # Entity
-│   │   │   ├── BookId.java            # Value Object (record)
-│   │   │   ├── MemberId.java          # Value Object (record)
-│   │   │   ├── LoanId.java            # Value Object (record)
-│   │   │   └── LoanStatus.java        # Enum: ACTIVE | RETURNED
-│   │   ├── port/
-│   │   │   ├── BookRepository.java    # Output port (owned by domain)
-│   │   │   ├── MemberRepository.java
-│   │   │   └── LoanRepository.java
-│   │   └── exception/
-│   │       ├── DomainException.java   # Base unchecked exception
-│   │       ├── BookNotFoundException.java
-│   │       ├── MemberNotFoundException.java
-│   │       └── LoanNotFoundException.java
-│   ├── application/
-│   │   ├── usecase/
-│   │   │   ├── BookUseCase.java       # Input port
-│   │   │   ├── MemberUseCase.java
-│   │   │   └── LoanUseCase.java
-│   │   └── service/
-│   │       ├── BookService.java
-│   │       ├── MemberService.java
-│   │       └── LoanService.java
-│   ├── infrastructure/
-│   │   └── persistence/
-│   │       ├── InMemoryBookRepository.java
-│   │       ├── InMemoryMemberRepository.java
-│   │       └── InMemoryLoanRepository.java
-│   └── main/
-│       └── LibraryApp.java            # Entry point — manual DI
+├── main/
+│   ├── java/pe/resteban/library/
+│   │   ├── domain/
+│   │   │   ├── model/
+│   │   │   │   ├── Book.java              # Aggregate root
+│   │   │   │   ├── Member.java            # Aggregate root
+│   │   │   │   ├── Loan.java              # Entity
+│   │   │   │   ├── BookId.java            # Value Object (record)
+│   │   │   │   ├── MemberId.java          # Value Object (record)
+│   │   │   │   ├── LoanId.java            # Value Object (record)
+│   │   │   │   └── LoanStatus.java        # Enum: ACTIVE | RETURNED
+│   │   │   ├── port/
+│   │   │   │   ├── BookRepository.java    # Output port (owned by domain)
+│   │   │   │   ├── MemberRepository.java
+│   │   │   │   └── LoanRepository.java
+│   │   │   └── exception/
+│   │   │       ├── DomainException.java
+│   │   │       ├── BookNotFoundException.java
+│   │   │       ├── MemberNotFoundException.java
+│   │   │       └── LoanNotFoundException.java
+│   │   ├── application/
+│   │   │   ├── usecase/
+│   │   │   │   ├── BookUseCase.java       # Input port
+│   │   │   │   ├── MemberUseCase.java
+│   │   │   │   └── LoanUseCase.java
+│   │   │   └── service/
+│   │   │       ├── BookService.java
+│   │   │       ├── MemberService.java
+│   │   │       └── LoanService.java
+│   │   ├── infrastructure/
+│   │   │   ├── persistence/
+│   │   │   │   ├── InMemoryBookRepository.java
+│   │   │   │   ├── InMemoryMemberRepository.java
+│   │   │   │   ├── InMemoryLoanRepository.java
+│   │   │   │   ├── JdbcBookRepository.java
+│   │   │   │   ├── JdbcMemberRepository.java
+│   │   │   │   └── JdbcLoanRepository.java
+│   │   │   ├── config/
+│   │   │   │   ├── AppConfig.java         # Reads application.properties
+│   │   │   │   ├── DataSourceFactory.java # H2 connection + schema bootstrap
+│   │   │   │   └── RepositoryFactory.java # Selects InMemory or JDBC adapters
+│   │   │   └── cli/
+│   │   │       └── LibraryCLI.java        # Interactive console adapter
+│   │   └── main/
+│   │       └── LibraryApp.java            # Entry point — manual DI
+│   └── resources/
+│       ├── application.properties         # repository.type + db config
+│       └── schema.sql                     # DDL for all 4 tables
 └── test/java/pe/resteban/library/
     ├── domain/
     │   ├── BookTest.java
@@ -101,7 +119,16 @@ src/
     └── infrastructure/
         ├── InMemoryBookRepositoryTest.java
         ├── InMemoryMemberRepositoryTest.java
-        └── InMemoryLoanRepositoryTest.java
+        ├── InMemoryLoanRepositoryTest.java
+        ├── JdbcTestBase.java              # Shared H2 setup for JDBC tests
+        ├── JdbcBookRepositoryTest.java
+        ├── JdbcMemberRepositoryTest.java
+        ├── JdbcLoanRepositoryTest.java
+        ├── AppConfigTest.java
+        ├── RepositoryFactoryTest.java
+        ├── LibraryIntegrationTest.java    # E2E — no mocks, real JDBC stack
+        └── cli/
+            └── LibraryCLITest.java        # Simulated console input
 ```
 
 ---
@@ -157,17 +184,50 @@ cd clean-architecture-java
 # Compile
 mvn compile
 
-# Run all tests
-mvn test
-
-# Run tests + JaCoCo coverage check (must pass 80% threshold)
+# Run all tests + JaCoCo coverage check (must pass 80% threshold)
 mvn clean verify
 
-# Run the demo application
+# Run the automated demo (default)
 mvn exec:java
+
+# Run the interactive CLI
+mvn exec:java -Dexec.args="--cli"
 
 # Open coverage report (after verify)
 # target/site/jacoco/index.html
+```
+
+### Persistence mode
+
+Controlled by `src/main/resources/application.properties` — no code change required:
+
+```properties
+# Use in-memory HashMaps (default — no DB needed)
+repository.type=inmemory
+
+# Use JDBC with embedded H2
+repository.type=jdbc
+db.url=jdbc:h2:mem:librarydb;DB_CLOSE_DELAY=-1
+db.user=sa
+db.password=
+```
+
+### CLI menu
+
+```
+── Books ─────────────────────────────
+  1. List all books
+  2. Add a book
+  3. Delete a book
+── Members ───────────────────────────
+  4. List all members
+  5. Register a member
+── Loans ─────────────────────────────
+  6. List all loans
+  7. Create a loan
+  8. Return a loan
+──────────────────────────────────────
+  0. Exit
 ```
 
 ---
@@ -176,16 +236,18 @@ mvn exec:java
 
 Results from `mvn clean verify` — JaCoCo 0.8.12, enforcement on `BUNDLE / INSTRUCTION`.
 
-| Package | Tests | Coverage |
+| Package | Tests | Notes |
 |---|---|---|
-| `domain.model` | 41 | ~90% |
-| `domain.exception` | 11 | ~100% |
-| `application.service` | 34 | ~97% |
-| `infrastructure.persistence` | 26 | ~100% |
-| **Total** | **112** | **≥ 80% ✓** |
+| `domain.model` | 41 | Zero mocks — pure Java objects |
+| `domain.exception` | 11 | Zero mocks |
+| `application.service` | 34 | Mockito mocks output ports |
+| `infrastructure.persistence` | 45 | InMemory + JDBC (H2) adapters |
+| `infrastructure.config` | 6 | AppConfig + RepositoryFactory |
+| `infrastructure.cli` | 16 | Simulated console input/output |
+| `integration` | 6 | Real JDBC stack, zero mocks |
+| **Total** | **159** | **≥ 80% ✓** |
 
-Tests use **JUnit 5** for all layers and **Mockito** only for the application layer (mocking output ports).
-The domain layer is tested with zero mocks — pure Java objects only.
+> `LibraryApp.main()` is intentionally excluded from coverage — testing a wiring entry point that prints to stdout would add noise without value.
 
 ---
 
@@ -193,21 +255,13 @@ The domain layer is tested with zero mocks — pure Java objects only.
 
 | Tool | Version | Scope |
 |---|---|---|
-| Java | 21 | Language (`record`, pattern matching) |
+| Java | 21 | Language (`record`, switch expressions) |
 | Maven | 3.x | Build |
 | JUnit Jupiter | 5.10.2 | Testing |
-| Mockito | 5.11.0 | Mocking (test scope) |
+| Mockito | 5.11.0 | Mocking (application layer tests only) |
 | JaCoCo | 0.8.12 | Coverage enforcement |
+| H2 | 2.2.224 | Embedded SQL database (runtime + test) |
 | exec-maven-plugin | 3.3.0 | Run main without fat jar |
-
----
-
-## Roadmap
-
-- [ ] JDBC repositories with embedded H2
-- [ ] Configurable persistence via `application.properties` (`inmemory` / `jdbc`)
-- [ ] Interactive CLI adapter
-- [ ] End-to-end integration test (no mocks — real wiring)
 
 ---
 

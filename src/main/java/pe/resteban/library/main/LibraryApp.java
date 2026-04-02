@@ -6,33 +6,52 @@ import pe.resteban.library.application.service.MemberService;
 import pe.resteban.library.domain.model.Book;
 import pe.resteban.library.domain.model.Loan;
 import pe.resteban.library.domain.model.Member;
-import pe.resteban.library.infrastructure.persistence.InMemoryBookRepository;
-import pe.resteban.library.infrastructure.persistence.InMemoryLoanRepository;
-import pe.resteban.library.infrastructure.persistence.InMemoryMemberRepository;
+import pe.resteban.library.domain.port.BookRepository;
+import pe.resteban.library.domain.port.LoanRepository;
+import pe.resteban.library.domain.port.MemberRepository;
+import pe.resteban.library.infrastructure.cli.LibraryCLI;
+import pe.resteban.library.infrastructure.config.AppConfig;
+import pe.resteban.library.infrastructure.config.RepositoryFactory;
 
 /**
  * Application entry point — manual dependency injection (no framework).
  *
- * <p>Wiring order:
- * <ol>
- *   <li>Repositories (infrastructure adapters)</li>
- *   <li>Services (application layer) receive repositories via constructor</li>
- *   <li>Demo flow executes through the service interfaces</li>
- * </ol>
+ * <p>Persistence adapter is selected at runtime via {@code application.properties}:
+ * <pre>
+ *   repository.type=inmemory   →  in-memory HashMap adapters (default)
+ *   repository.type=jdbc       →  JDBC adapters backed by H2 embedded database
+ * </pre>
+ *
+ * <p>Run mode is controlled by the first command-line argument:
+ * <pre>
+ *   (no args) or --demo   →  automated demo flow
+ *   --cli                 →  interactive console menu
+ * </pre>
  */
 public class LibraryApp {
 
     public static void main(String[] args) {
 
-        // ── 1. Repositories ───────────────────────────────────────────────────
-        InMemoryBookRepository   bookRepository   = new InMemoryBookRepository();
-        InMemoryMemberRepository memberRepository = new InMemoryMemberRepository();
-        InMemoryLoanRepository   loanRepository   = new InMemoryLoanRepository();
+        // ── 1. Config + Repository factory ───────────────────────────────────
+        AppConfig         config  = new AppConfig();
+        RepositoryFactory factory = new RepositoryFactory(config);
+
+        BookRepository   bookRepository   = factory.bookRepository();
+        MemberRepository memberRepository = factory.memberRepository();
+        LoanRepository   loanRepository   = factory.loanRepository();
+
+        print("Repository type : " + config.getRepositoryType());
 
         // ── 2. Services ───────────────────────────────────────────────────────
         BookService   bookService   = new BookService(bookRepository);
         MemberService memberService = new MemberService(memberRepository);
         LoanService   loanService   = new LoanService(loanRepository, bookRepository, memberRepository);
+
+        // ── 3. Mode selection ─────────────────────────────────────────────────
+        if (args.length > 0 && args[0].equalsIgnoreCase("--cli")) {
+            new LibraryCLI(bookService, memberService, loanService).start();
+            return;
+        }
 
         // ── 3. Demo flow ──────────────────────────────────────────────────────
         separator("LIBRARY MANAGEMENT SYSTEM — demo");
